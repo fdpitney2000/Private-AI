@@ -21,8 +21,37 @@ const express = require('express');
 const router  = express.Router();
 const { requireAuth, isModelAllowed } = require('../middleware/auth');
 
-// Default model for free tier users
-const FREE_TIER_MODEL = 'mistralai/mistral-7b-instruct';
+// Default model for free tier users.
+// IMPORTANT: must include ":free" suffix or OpenRouter routes to the
+// paid endpoint, which can 404 if there's no active route / no credit.
+const FREE_TIER_MODEL = 'mistralai/mistral-7b-instruct:free';
+
+// Fallback model if the primary free model is down. OpenRouter's free
+// catalog changes often — see https://openrouter.ai/models?max_price=0
+const FALLBACK_FREE_MODEL = 'meta-llama/llama-4-scout:free';
+
+// -------------------------------------------------------
+// Helper: call the OpenRouter chat completions endpoint
+// -------------------------------------------------------
+async function callOpenRouter(model, messages) {
+  return fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization':    `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'Content-Type':     'application/json',
+      // OpenRouter optionally uses HTTP-Referer for analytics.
+      // Using a generic label keeps users anonymous there too.
+      'HTTP-Referer':     process.env.APP_URL || 'http://localhost:3000',
+      'X-Title':          'Privacy Chat App',
+    },
+    body: JSON.stringify({
+      model:      model,
+      messages:   messages,
+      stream:     true,   // Stream tokens as they're generated
+      max_tokens: 2048,
+    }),
+  });
+}
 
 // -------------------------------------------------------
 // POST /api/chat
@@ -63,23 +92,16 @@ router.post('/', requireAuth, async (req, res) => {
     // We don't log req.body.messages content here intentionally.
     console.log(`[chat] Relaying to OpenRouter — model: ${model}, plan: ${req.plan.tier}`);
 
-    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization':    `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type':     'application/json',
-        // OpenRouter optionally uses HTTP-Referer for analytics.
-        // Using a generic label keeps users anonymous there too.
-        'HTTP-Referer':     process.env.APP_URL || 'http://localhost:3000',
-        'X-Title':          'Privacy Chat App',
-      },
-      body: JSON.stringify({
-        model:    model,
-        messages: messages,
-        stream:   true,   // Stream tokens as they're generated
-        max_tokens: 2048,
-      }),
-    });
+    let openRouterResponse = await callOpenRouter(model, messages);
+
+    // ---- Fallback: free models on OpenRouter go down/disappear often. ----
+    // If the primary model 404s (no endpoint) and a fallback is configured
+    // for this plan, retry once with the fallback before giving up.
+    if (!openRouterResponse.ok && openRouterResponse.status === 404 && model === FREE_TIER_MODEL) {
+      console.warn(`[chat] ${model} returned 404, retrying with fallback ${FALLBACK_FREE_MODEL}`);
+      model = FALLBACK_FREE_MODEL;
+      openRouterResponse = await callOpenRouter(model, messages);
+    }
 
     if (!openRouterResponse.ok) {
       const errorText = await openRouterResponse.text();
@@ -136,14 +158,14 @@ router.get('/models', requireAuth, (req, res) => {
 
   // The model catalogue — display names for the frontend
   const allModels = [
-    { id: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B (Free)',      minPlan: 'free'   },
-    { id: 'google/gemma-7b-it',            name: 'Gemma 7B (Free)',        minPlan: 'free'   },
-    { id: 'openai/gpt-4o-mini',            name: 'GPT-4o Mini',            minPlan: 'pro50'  },
-    { id: 'anthropic/claude-3-haiku',      name: 'Claude 3 Haiku',         minPlan: 'pro50'  },
-    { id: 'openai/gpt-4o',                name: 'GPT-4o',                 minPlan: 'pro100' },
-    { id: 'anthropic/claude-3-5-sonnet',   name: 'Claude 3.5 Sonnet',      minPlan: 'pro100' },
-    { id: 'anthropic/claude-opus-4',       name: 'Claude Opus 4',          minPlan: 'pro200' },
-    { id: 'openai/o1',                     name: 'OpenAI o1',              minPlan: 'pro200' },
+    { id: 'cohere/north-mini-code:free',        name: 'Cohere 30B',          minPlan: 'free'   },
+    { id: 'nex-agi/nex-n2-pro:free',            name: 'Nex 397B',            minPlan: 'free'   },
+    { id: 'openai/gpt-4o-mini',                 name: 'GPT-4o Mini',         minPlan: 'pro50'  },
+    { id: 'anthropic/claude-3-5-haiku',         name: 'Claude 3.5 Haiku',    minPlan: 'pro50'  },
+    { id: 'openai/gpt-4o',                      name: 'GPT-4o',              minPlan: 'pro100' },
+    { id: 'anthropic/claude-3-5-sonnet',        name: 'Claude 3.5 Sonnet',   minPlan: 'pro100' },
+    { id: 'anthropic/claude-opus-4',            name: 'Claude Opus 4',       minPlan: 'pro200' },
+    { id: 'openai/o1',                          name: 'OpenAI o1',           minPlan: 'pro200' },
   ];
 
   const available = allowed.includes('*')
