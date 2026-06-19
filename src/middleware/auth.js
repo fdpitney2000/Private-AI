@@ -22,8 +22,8 @@ const PLAN_LIMITS = {
     requestsPerDay: 10,
     // Models allowed on the free tier (low-cost OpenRouter models)
     allowedModels: [
-      'mistralai/mistral-7b-instruct',
-      'google/gemma-7b-it',
+      'cohere/north-mini-code:free',
+      'nex-agi/nex-n2-pro:free',
     ],
   },
   pro50: {
