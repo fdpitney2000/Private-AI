@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Private Chat</title>
+  <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Content Security Policy — important for privacy -->
+  <!-- Only allow scripts from self, block inline scripts except ones we define -->
+  <!-- Adjust if you add external CDN scripts -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+</head>
+<body>
+
+  <!-- ================================================
+       TOP BAR: Plan badge + upgrade button
+       ================================================ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 class="app-title">Private Chat</h1>
+      <span id="plan-badge" class="plan-badge plan-free">Free</span>
+    </div>
+    <div class="topbar-right">
+      <!-- Model selector (populated by JS from /api/chat/models) -->
+      <select id="model-select" title="Select AI model">
+        <option value="">Loading models…</option>
+      </select>
+      <button id="upgrade-btn" class="btn btn-primary">Upgrade</button>
+      <button id="recover-btn" class="btn btn-secondary">Recover Account</button>
+    </div>
+  </header>
+
+  <!-- ================================================
+       MAIN LAYOUT
+       ================================================ -->
+  <main class="main-layout">
+
+    <!-- Chat area -->
+    <section class="chat-section">
+      <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+        <!-- Welcome message -->
+        <div class="message system-message">
+          <p>Welcome! Your identity is completely anonymous. Chats are stored only in this browser — never on any server.</p>
+          <p>Your anonymous ID: <code id="display-uid">…</code></p>
+        </div>
+      </div>
+
+      <!-- Input row -->
+      <form id="chat-form" class="chat-input-row" novalidate>
+        <textarea
+          id="message-input"
+          class="message-textarea"
+          placeholder="Type a message… (Shift+Enter for new line)"
+          rows="1"
+          maxlength="8000"
+          aria-label="Message input"
+        ></textarea>
+        <button type="submit" id="send-btn" class="btn btn-primary" aria-label="Send message">
+          Send
+        </button>
+      </form>
+
+      <!-- Status bar: rate limit info -->
+      <div class="status-bar">
+        <span id="usage-info" class="usage-info"></span>
+        <button id="clear-history-btn" class="btn btn-ghost btn-sm">Clear history</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================================================
+       MODALS
+       ================================================ -->
+
+  <!-- Upgrade modal -->
+  <div id="upgrade-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="upgrade-title" hidden>
+    <div class="modal-content">
+      <h2 id="upgrade-title">Choose a Plan</h2>
+      <p class="modal-subtitle">Anonymous checkout — no email required by us. All plans are monthly.</p>
+
+      <div class="plan-grid">
+        <div class="plan-card" data-plan="pro50">
+          <div class="plan-name">Pro 50</div>
+          <div class="plan-price">$50<span>/mo</span></div>
+          <ul class="plan-features">
+            <li>200 requests / day</li>
+            <li>GPT-4o Mini</li>
+            <li>Claude 3 Haiku</li>
+          </ul>
+          <button class="btn btn-primary upgrade-select-btn">Select</button>
+        </div>
+        <div class="plan-card featured" data-plan="pro100">
+          <div class="plan-badge-inner">Most Popular</div>
+          <div class="plan-name">Pro 100</div>
+          <div class="plan-price">$100<span>/mo</span></div>
+          <ul class="plan-features">
+            <li>500 requests / day</li>
+            <li>GPT-4o</li>
+            <li>Claude 3.5 Sonnet</li>
+          </ul>
+          <button class="btn btn-primary upgrade-select-btn">Select</button>
+        </div>
+        <div class="plan-card" data-plan="pro200">
+          <div class="plan-name">Pro 200</div>
+          <div class="plan-price">$200<span>/mo</span></div>
+          <ul class="plan-features">
+            <li>2000 requests / day</li>
+            <li>All models</li>
+            <li>Claude Opus 4</li>
+          </ul>
+          <button class="btn btn-primary upgrade-select-btn">Select</button>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost modal-close" data-modal="upgrade-modal">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Recovery key modal (shown once after upgrade) -->
+  <div id="recovery-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="recovery-title" hidden>
+    <div class="modal-content">
+      <h2 id="recovery-title">Save Your Recovery Key</h2>
+      <p>This is your <strong>only</strong> way to recover access if you clear your browser data. Write it down somewhere safe.</p>
+      <p><strong>It will not be shown again.</strong></p>
+      <div id="recovery-key-display" class="recovery-key-box" role="region" aria-label="Recovery key"></div>
+      <div class="modal-actions">
+        <button id="copy-recovery-btn" class="btn btn-secondary">Copy Key</button>
+        <button class="btn btn-primary modal-close" data-modal="recovery-modal">I've saved it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account recovery input modal -->
+  <div id="recover-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="recover-title" hidden>
+    <div class="modal-content">
+      <h2 id="recover-title">Recover Account</h2>
+      <p>Enter the recovery key you saved when you upgraded.</p>
+      <input type="text" id="recovery-key-input" class="input-field" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19">
+      <div id="recover-error" class="error-msg" hidden></div>
+      <div class="modal-actions">
+        <button id="recover-submit-btn" class="btn btn-primary">Recover</button>
+        <button class="btn btn-ghost modal-close" data-modal="recover-modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backdrop -->
+  <div id="modal-backdrop" class="modal-backdrop" hidden></div>
+
+  <!-- Main JS -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
