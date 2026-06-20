@@ -19,7 +19,7 @@ const { getSubscription, incrementRequestCount } = require('../services/supabase
 // Define what each plan can do. Add or change tiers here.
 const PLAN_LIMITS = {
   free: {
-    requestsPerDay: 10,
+    requestsPerDay: 2000,
     // Models allowed on the free tier (low-cost OpenRouter models)
     allowedModels: [
       'cohere/north-mini-code:free',
