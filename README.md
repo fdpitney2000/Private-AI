@@ -1,5 +1,5 @@
 # Privacy-First AI Chat App
-
+No end-user data (email, phone, etc) is collected. Anonymous UID + password generated client-side and stored only in the browser. Free tier plus three paid monthly tiers ($50 / $100 / $200) via Stripe. The server acts as a relay to OpenRouter and never stores prompts or responses.
 ## Folder Structure
 
 ```
