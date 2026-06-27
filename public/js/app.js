@@ -359,24 +359,56 @@ function providerLogoHTML(provider) {
 }
 
 async function loadModels() {
+  const pickerLabel = document.getElementById('model-picker-selected');
+
+  // Give the request a hard timeout so a slow/stalled server response
+  // shows up as a visible, retryable error instead of leaving the
+  // button stuck on "Loading models..." forever with no feedback.
+  const controller = new AbortController();
+  const timeoutId   = setTimeout(() => controller.abort(), 10000);
+
   try {
     const subToken  = localStorage.getItem(STORAGE_KEYS.subToken) || 'free';
     const isMinor    = document.body.dataset.mode === 'minor';
     const query      = isMinor ? '?minorMode=true' : '';
 
     const response = await fetch(`/api/chat/models${query}`, {
-      headers: { 'Authorization': `Bearer ${subToken}` }
+      headers: { 'Authorization': `Bearer ${subToken}` },
+      signal: controller.signal,
     });
 
-    if (!response.ok) return;
+    if (!response.ok) {
+      console.error(`[models] Server returned ${response.status} for /api/chat/models`);
+      showModelLoadError(pickerLabel, `Couldn't load models (${response.status}) — tap to retry`);
+      return;
+    }
 
     const data = await response.json();
     lastModelsResponse = data;
+    delete document.getElementById('model-picker-btn')?.dataset.loadFailed;
     renderModelPicker(data);
 
   } catch (err) {
+    const message = err.name === 'AbortError'
+      ? "Request timed out — tap to retry"
+      : "Couldn't load models — tap to retry";
     console.error('[models] Could not load models:', err.message);
+    showModelLoadError(pickerLabel, message);
+  } finally {
+    clearTimeout(timeoutId);
   }
+}
+
+// Shows a clickable error state in the model picker button instead of
+// leaving it stuck on "Loading models..." with no feedback. The
+// existing click handler on this button (wired in DOMContentLoaded)
+// checks data-load-failed and retries instead of opening the (empty)
+// dropdown when this is set.
+function showModelLoadError(labelEl, message) {
+  if (!labelEl) return;
+  labelEl.textContent = message;
+  const btn = document.getElementById('model-picker-btn');
+  if (btn) btn.dataset.loadFailed = 'true';
 }
 
 function renderModelPicker(data) {
@@ -703,6 +735,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Model picker dropdown ---
   document.getElementById('model-picker-btn').addEventListener('click', (e) => {
     e.stopPropagation();
+    const btn = e.currentTarget;
+    if (btn.dataset.loadFailed === 'true') {
+      delete btn.dataset.loadFailed;
+      document.getElementById('model-picker-selected').textContent = 'Loading models…';
+      loadModels();
+      return;
+    }
     toggleModelPicker();
   });
   document.addEventListener('click', (e) => {
