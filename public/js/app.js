@@ -184,6 +184,13 @@ async function sendMessage(userText) {
     const subToken    = localStorage.getItem(STORAGE_KEYS.subToken) || 'free';
     const uid         = localStorage.getItem(STORAGE_KEYS.uid);
     const selectedModel = document.getElementById('model-select').value;
+    const isMinorMode   = document.body.dataset.mode === 'minor';
+
+    // "No-training models only" is forced on automatically in minor
+    // mode (better default for a young person's data), otherwise it
+    // reflects whatever the user picked in the privacy radio toggle.
+    const noTrainRadio = document.querySelector('input[name="data-policy"]:checked');
+    const noTrainOnly  = isMinorMode || (noTrainRadio && noTrainRadio.value === 'no-train');
 
     // POST to our relay server — NOT to OpenRouter directly.
     // The server holds the OpenRouter API key securely.
@@ -195,8 +202,10 @@ async function sendMessage(userText) {
         'X-Anonymous-UID':  uid || 'unknown', // for free-tier rate limiting
       },
       body: JSON.stringify({
-        messages: history,          // full conversation context
-        model:    selectedModel,
+        messages:    history,          // full conversation context
+        model:       selectedModel,
+        noTrainOnly: noTrainOnly,
+        minorMode:   isMinorMode,
       }),
     });
 
@@ -298,11 +307,14 @@ async function loadAccountStatus() {
 
     const data = await response.json();
 
-    // Update plan badge
+    // Update plan badge (teen.html keeps its own "Teen Mode" label
+    // rather than showing the underlying free-tier plan name)
     const badge = document.getElementById('plan-badge');
-    const planNames = { free: 'Free', pro50: 'Pro 50', pro100: 'Pro 100', pro200: 'Pro 200' };
-    badge.textContent = planNames[data.plan] || data.plan;
-    badge.className   = `plan-badge plan-${data.plan}`;
+    if (document.body.dataset.mode !== 'minor') {
+      const planNames = { free: 'Free', pro50: 'Pro 50', pro100: 'Pro 100', pro200: 'Pro 200' };
+      badge.textContent = planNames[data.plan] || data.plan;
+      badge.className   = `plan-badge plan-${data.plan}`;
+    }
 
     // Update usage info
     const usageEl = document.getElementById('usage-info');
@@ -314,8 +326,10 @@ async function loadAccountStatus() {
     // Cache plan locally
     localStorage.setItem(STORAGE_KEYS.plan, data.plan);
 
-    // Show/hide upgrade button
-    document.getElementById('upgrade-btn').hidden = data.plan === 'pro200';
+    // Show/hide upgrade button (never shown in minor mode — see DOMContentLoaded)
+    if (document.body.dataset.mode !== 'minor') {
+      document.getElementById('upgrade-btn').hidden = data.plan === 'pro200';
+    }
 
   } catch (err) {
     console.error('[status] Could not load account status:', err.message);
@@ -323,27 +337,162 @@ async function loadAccountStatus() {
 }
 
 // ============================================================
-// 6. MODEL LIST
+// 6. MODEL LIST — custom dropdown with provider logos
 // ============================================================
+// Native <select><option> elements can't render an <img>/<span> logo
+// inside them, so the model picker is a button + popover list built
+// here instead. The hidden #model-select input still holds "the
+// selected model" so the rest of the app (sendMessage, etc.) doesn't
+// need to know about this.
+
+const FREE_MODELS_VISIBLE_BY_DEFAULT = 2;
+let freeModelsExpanded = false;
+let lastModelsResponse = null; // cached so "show more" can re-render without refetching
+
+// Generic monogram badge for a provider. Deliberately NOT an official
+// brand logo (see the CSS comment on .model-logo for why). Swap these
+// for <img> tags if you obtain official logos under each company's
+// brand guidelines.
+function providerLogoHTML(provider) {
+  const letter = { openai: 'O', google: 'G', anthropic: 'A' }[provider] || '?';
+  return `<span class="model-logo ${provider || 'free'}" aria-hidden="true">${letter}</span>`;
+}
 
 async function loadModels() {
   try {
-    const subToken = localStorage.getItem(STORAGE_KEYS.subToken) || 'free';
-    const response = await fetch('/api/chat/models', {
+    const subToken  = localStorage.getItem(STORAGE_KEYS.subToken) || 'free';
+    const isMinor    = document.body.dataset.mode === 'minor';
+    const query      = isMinor ? '?minorMode=true' : '';
+
+    const response = await fetch(`/api/chat/models${query}`, {
       headers: { 'Authorization': `Bearer ${subToken}` }
     });
 
     if (!response.ok) return;
 
-    const { models } = await response.json();
-    const select = document.getElementById('model-select');
-    select.innerHTML = models
-      .map(m => `<option value="${m.id}">${m.name}</option>`)
-      .join('');
+    const data = await response.json();
+    lastModelsResponse = data;
+    renderModelPicker(data);
 
   } catch (err) {
     console.error('[models] Could not load models:', err.message);
   }
+}
+
+function renderModelPicker(data) {
+  const panel = document.getElementById('model-picker-panel');
+  const hiddenInput = document.getElementById('model-select');
+  const { flagship = [], free = [] } = data;
+
+  let html = '';
+
+  // ---- Flagship section (latest OpenAI / Gemini / Claude models) ----
+  if (flagship.length) {
+    html += `<div class="model-group-label">Flagship models</div>`;
+    flagship.forEach(m => {
+      const isSelected = hiddenInput.value === m.id;
+      const lockNote = m.locked
+        ? `<span class="model-row-lock">Upgrade to ${planLabel(m.requiredPlan)}</span>`
+        : '';
+      html += `
+        <div class="model-row ${m.locked ? 'locked' : ''} ${isSelected ? 'selected' : ''}"
+             data-model-id="${m.id}" data-locked="${!!m.locked}" role="option" tabindex="0">
+          ${providerLogoHTML(m.provider)}
+          <span class="model-row-name">${m.name}</span>
+          ${lockNote}
+        </div>`;
+    });
+  }
+
+  // ---- Free section (dynamic — first 2, with "show more") ----
+  if (free.length) {
+    html += `<div class="model-group-label">Free models</div>`;
+    const visibleCount = freeModelsExpanded ? free.length : Math.min(FREE_MODELS_VISIBLE_BY_DEFAULT, free.length);
+
+    free.slice(0, visibleCount).forEach(m => {
+      const isSelected = hiddenInput.value === m.id;
+      html += `
+        <div class="model-row ${isSelected ? 'selected' : ''}"
+             data-model-id="${m.id}" data-locked="false" role="option" tabindex="0">
+          ${providerLogoHTML('free')}
+          <span class="model-row-name">${m.name}</span>
+        </div>`;
+    });
+
+    if (!freeModelsExpanded && free.length > FREE_MODELS_VISIBLE_BY_DEFAULT) {
+      html += `<button type="button" class="model-show-more" id="show-more-free-btn">
+        Show ${free.length - FREE_MODELS_VISIBLE_BY_DEFAULT} more free models
+      </button>`;
+    }
+  }
+
+  panel.innerHTML = html || '<div class="model-group-label">No models available</div>';
+
+  // Wire up row clicks
+  panel.querySelectorAll('.model-row').forEach(row => {
+    row.addEventListener('click', () => onModelRowClick(row));
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onModelRowClick(row); }
+    });
+  });
+
+  const showMoreBtn = document.getElementById('show-more-free-btn');
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      freeModelsExpanded = true;
+      renderModelPicker(lastModelsResponse);
+    });
+  }
+
+  // Pick a sensible default selection if nothing is selected yet
+  if (!hiddenInput.value) {
+    const firstUnlocked = flagship.find(m => !m.locked) || free[0];
+    if (firstUnlocked) selectModel(firstUnlocked.id, firstUnlocked.name);
+  } else {
+    // Keep the button label in sync with whatever's already selected
+    const current = [...flagship, ...free].find(m => m.id === hiddenInput.value);
+    if (current) document.getElementById('model-picker-selected').textContent = current.name;
+  }
+}
+
+function onModelRowClick(row) {
+  const modelId = row.dataset.modelId;
+  const locked  = row.dataset.locked === 'true';
+
+  if (locked) {
+    closeModelPicker();
+    showUpgradeModal();
+    return;
+  }
+
+  const name = row.querySelector('.model-row-name').textContent;
+  selectModel(modelId, name);
+  closeModelPicker();
+}
+
+function selectModel(id, name) {
+  document.getElementById('model-select').value = id;
+  document.getElementById('model-picker-selected').textContent = name;
+  // Re-render so the "selected" highlight moves to the new row
+  if (lastModelsResponse) renderModelPicker(lastModelsResponse);
+}
+
+function planLabel(plan) {
+  return { free: 'Free', pro50: 'Pro 50', pro100: 'Pro 100', pro200: 'Pro 200' }[plan] || plan;
+}
+
+function toggleModelPicker() {
+  const panel = document.getElementById('model-picker-panel');
+  const btn   = document.getElementById('model-picker-btn');
+  const isOpen = !panel.hidden;
+  panel.hidden = isOpen;
+  btn.setAttribute('aria-expanded', String(!isOpen));
+}
+
+function closeModelPicker() {
+  document.getElementById('model-picker-panel').hidden = true;
+  document.getElementById('model-picker-btn').setAttribute('aria-expanded', 'false');
 }
 
 // ============================================================
@@ -397,9 +546,11 @@ function handleCheckoutReturn() {
       localStorage.setItem(STORAGE_KEYS.subToken, pendingToken);
       localStorage.removeItem('pc_pending_token');
 
-      // Show recovery key modal if we have one
-      if (pendingRecKey) {
-        document.getElementById('recovery-key-display').textContent = pendingRecKey;
+      // Show recovery key modal if we have one (no-op on pages without
+      // a recovery modal, e.g. teen.html)
+      const recoveryDisplay = document.getElementById('recovery-key-display');
+      if (pendingRecKey && recoveryDisplay) {
+        recoveryDisplay.textContent = pendingRecKey;
         showModal('recovery-modal');
         localStorage.removeItem('pc_pending_recovery_key');
       }
@@ -496,6 +647,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Identity ---
   initIdentity();
 
+  // --- Minor mode UI adjustments ---
+  // teen.html sets <body data-mode="minor">. In that mode we hide
+  // billing/upgrade/recovery (no commerce flows on a minors-focused
+  // page) and the privacy radio (no-train routing is forced on
+  // automatically server-side for minor-mode requests regardless).
+  if (document.body.dataset.mode === 'minor') {
+    const upgradeBtn   = document.getElementById('upgrade-btn');
+    const recoverBtn   = document.getElementById('recover-btn');
+    const privacyToggle = document.querySelector('.privacy-toggle');
+    if (upgradeBtn)    upgradeBtn.hidden = true;
+    if (recoverBtn)    recoverBtn.hidden = true;
+    if (privacyToggle) privacyToggle.hidden = true;
+  }
+
   // --- Load from Stripe redirect if returning from checkout ---
   handleCheckoutReturn();
 
@@ -532,10 +697,22 @@ document.addEventListener('DOMContentLoaded', () => {
     this.style.height = Math.min(this.scrollHeight, 160) + 'px';
   });
 
-  // --- Upgrade button ---
-  document.getElementById('upgrade-btn').addEventListener('click', showUpgradeModal);
+  // --- Upgrade button (not present on teen.html by design) ---
+  document.getElementById('upgrade-btn')?.addEventListener('click', showUpgradeModal);
 
-  // --- Plan selection in upgrade modal ---
+  // --- Model picker dropdown ---
+  document.getElementById('model-picker-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleModelPicker();
+  });
+  document.addEventListener('click', (e) => {
+    const picker = document.querySelector('.model-picker');
+    if (picker && !picker.contains(e.target)) closeModelPicker();
+  });
+
+  // --- Privacy toggle: re-send isn't needed, sendMessage reads the radio live ---
+
+  // --- Plan selection in upgrade modal (no-op on teen.html — empty list) ---
   document.querySelectorAll('.upgrade-select-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const plan = btn.closest('.plan-card').dataset.plan;
@@ -544,15 +721,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // --- Recover account button ---
-  document.getElementById('recover-btn').addEventListener('click', () => {
+  // --- Recover account button (not present on teen.html by design) ---
+  document.getElementById('recover-btn')?.addEventListener('click', () => {
     showModal('recover-modal');
   });
 
-  document.getElementById('recover-submit-btn').addEventListener('click', recoverAccount);
+  document.getElementById('recover-submit-btn')?.addEventListener('click', recoverAccount);
+
 
   // --- Copy recovery key ---
-  document.getElementById('copy-recovery-btn').addEventListener('click', () => {
+  // --- Copy recovery key (not present on teen.html by design) ---
+  document.getElementById('copy-recovery-btn')?.addEventListener('click', () => {
     const key = document.getElementById('recovery-key-display').textContent;
     navigator.clipboard.writeText(key).then(() => {
       document.getElementById('copy-recovery-btn').textContent = 'Copied!';

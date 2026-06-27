@@ -386,6 +386,177 @@ code {
 @keyframes blink  { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
 /* ============================================================
+   Privacy toggle (no-train radio group)
+   ============================================================ */
+.privacy-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.privacy-toggle-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.privacy-toggle-option input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.privacy-toggle-option:has(input:checked) span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Model picker (custom dropdown — native <select> can't render
+   logos inside its options, so this is a button + popover list)
+   ============================================================ */
+.model-picker {
+  position: relative;
+}
+
+.model-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 220px;
+}
+
+.model-picker-btn .chevron { color: var(--text-muted); font-size: 11px; }
+
+.model-picker-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 280px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  z-index: 50;
+  padding: 6px;
+}
+
+.model-picker-panel[hidden] { display: none; }
+
+.model-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 8px 8px 4px;
+}
+
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.model-row:hover { background: var(--bg); }
+
+.model-row.selected { background: var(--accent-dim); }
+
+.model-row.locked {
+  cursor: pointer; /* still clickable -> opens upgrade modal */
+  opacity: 0.55;
+}
+
+.model-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.model-row-lock { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+/* Generic provider logo badges — deliberately NOT official brand
+   logos (those are trademarked assets). These are simple monogram
+   badges so the picker still visually distinguishes providers. If you
+   later obtain official logos under each company's brand guidelines,
+   swap the <span class="model-logo"> elements in app.js for <img>
+   tags pointing at /images/logos/*.svg. */
+.model-logo {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.model-logo.openai    { background: #14a37f; }
+.model-logo.google    { background: #4285f4; }
+.model-logo.anthropic { background: #d97757; }
+.model-logo.free      { background: var(--text-muted); }
+
+.model-show-more {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.model-show-more:hover { text-decoration: underline; }
+
+/* ============================================================
+   "Permission to speak freely" tagline above the input
+   ============================================================ */
+.freedom-quote {
+  text-align: center;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 6px 0;
+  border-left: none;
+  margin: 0;
+}
+
+/* ============================================================
+   Minor-mode safety banner (used on teen.html)
+   ============================================================ */
+.safety-banner {
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  text-align: center;
+  margin: 10px 0;
+}
+
+
+/* ============================================================
    Markdown-like formatting in assistant messages
    ============================================================ */
 .message-bubble pre {

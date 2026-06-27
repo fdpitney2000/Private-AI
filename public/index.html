@@ -23,10 +23,32 @@
       <span id="plan-badge" class="plan-badge plan-free">Free</span>
     </div>
     <div class="topbar-right">
-      <!-- Model selector (populated by JS from /api/chat/models) -->
-      <select id="model-select" title="Select AI model">
-        <option value="">Loading models…</option>
-      </select>
+      <!-- Privacy routing toggle: standard vs. no-training-only providers -->
+      <div class="privacy-toggle" role="radiogroup" aria-label="Data privacy preference">
+        <label class="privacy-toggle-option">
+          <input type="radio" name="data-policy" value="standard" checked>
+          <span>Standard</span>
+        </label>
+        <label class="privacy-toggle-option">
+          <input type="radio" name="data-policy" value="no-train">
+          <span>No-training models only</span>
+        </label>
+      </div>
+
+      <!-- Custom model picker (native <select> can't show logos in its
+           options, so this is a button + popover list built in app.js,
+           populated from /api/chat/models). The hidden input below is
+           what the rest of the app reads as "the selected model". -->
+      <div class="model-picker">
+        <button id="model-picker-btn" type="button" class="model-picker-btn"
+                aria-haspopup="listbox" aria-expanded="false">
+          <span id="model-picker-selected">Loading models…</span>
+          <span class="chevron" aria-hidden="true">▾</span>
+        </button>
+        <div id="model-picker-panel" class="model-picker-panel" role="listbox" hidden></div>
+        <input type="hidden" id="model-select" value="">
+      </div>
+
       <button id="upgrade-btn" class="btn btn-primary">Upgrade</button>
       <button id="recover-btn" class="btn btn-secondary">Recover Account</button>
     </div>
@@ -42,12 +64,16 @@
       <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
         <!-- Welcome message -->
         <div class="message system-message">
-          <p>Humans live public, private, and secret lives. We flourish in the latter two.</p>
-          <br>
-          <p>Zero user data is collected. The only identifying information sent to the AI providers are those of this <a href="https://southwhidbey.online/about.html">social purpose corporation</a>.</p>
+          <p>Welcome! Your identity is completely anonymous. Chats are stored only in this browser — never on any server.</p>
           <p>Your anonymous ID: <code id="display-uid">…</code></p>
         </div>
       </div>
+
+      <!-- Tagline shown directly above the input — describes this
+           app's own privacy stance (nothing logged, nothing trained
+           on). Deliberately just UI copy, never sent as part of any
+           request to the relayed AI models. -->
+      <blockquote class="freedom-quote">Permission to speak freely has been granted.</blockquote>
 
       <!-- Input row -->
       <form id="chat-form" class="chat-input-row" novalidate>
@@ -89,8 +115,8 @@
           <div class="plan-price">$50<span>/mo</span></div>
           <ul class="plan-features">
             <li>200 requests / day</li>
-            <li>GPT-4o Mini</li>
-            <li>Claude 3 Haiku</li>
+            <li>Cheap-tier flagship models</li>
+            <li>(mini / haiku / flash class)</li>
           </ul>
           <button class="btn btn-primary upgrade-select-btn">Select</button>
         </div>
@@ -100,8 +126,8 @@
           <div class="plan-price">$100<span>/mo</span></div>
           <ul class="plan-features">
             <li>500 requests / day</li>
-            <li>GPT-4o</li>
-            <li>Claude 3.5 Sonnet</li>
+            <li>Latest frontier models</li>
+            <li>OpenAI, Gemini &amp; Claude Sonnet</li>
           </ul>
           <button class="btn btn-primary upgrade-select-btn">Select</button>
         </div>
@@ -110,8 +136,8 @@
           <div class="plan-price">$200<span>/mo</span></div>
           <ul class="plan-features">
             <li>2000 requests / day</li>
-            <li>All models</li>
-            <li>Claude Opus 4</li>
+            <li>Every model, unrestricted</li>
+            <li>Including Claude Opus</li>
           </ul>
           <button class="btn btn-primary upgrade-select-btn">Select</button>
         </div>

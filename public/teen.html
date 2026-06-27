@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Private Chat — Teen Mode</title>
+  <link rel="stylesheet" href="/css/style.css">
+
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+</head>
+<!--
+  IMPORTANT — read before relying on this page:
+
+  This page restricts the model picker to a curated allowlist of
+  closed-lab models (OpenAI / Google / Anthropic) and the server
+  force-injects a safety-oriented system prompt for every request made
+  from here (see isMinorSafeModel() and MINOR_SYSTEM_PROMPT in
+  src/routes/chat.js). That part is a real, server-enforced control.
+
+  What this page does NOT do:
+    - Verify anyone's age. The app has no accounts, so there's no way
+      to confirm who's actually using this page.
+    - Prevent a technically capable person from calling POST /api/chat
+      directly without minorMode set, bypassing these restrictions
+      entirely — the underlying API endpoint is shared.
+    - Provide any guarantee that model output is always appropriate
+      for a young person. AI models can still make mistakes.
+    - Satisfy regulatory requirements (e.g. COPPA in the US) on its
+      own — those generally require verified parental consent and
+      restrictions on data collection from children, which is a
+      bigger undertaking than a model allowlist. If you intend this
+      for real use with children, that's worth looking into properly
+      (this isn't legal advice).
+
+  Treat this as a UX-level safety default, not an age-verified or
+  legally compliant child-safety system.
+-->
+<body data-mode="minor">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <h1 class="app-title">Private Chat</h1>
+      <span id="plan-badge" class="plan-badge plan-free">Teen Mode</span>
+    </div>
+    <div class="topbar-right">
+      <!-- Privacy toggle is intentionally omitted here — no-train
+           routing is forced on automatically for every minor-mode
+           request server-side, regardless of any UI control. -->
+
+      <div class="model-picker">
+        <button id="model-picker-btn" type="button" class="model-picker-btn"
+                aria-haspopup="listbox" aria-expanded="false">
+          <span id="model-picker-selected">Loading models…</span>
+          <span class="chevron" aria-hidden="true">▾</span>
+        </button>
+        <div id="model-picker-panel" class="model-picker-panel" role="listbox" hidden></div>
+        <input type="hidden" id="model-select" value="">
+      </div>
+      <!-- No upgrade / recover-account buttons on this page by design —
+           billing flows aren't appropriate to offer here. -->
+    </div>
+  </header>
+
+  <main class="main-layout">
+    <section class="chat-section">
+
+      <div class="safety-banner">
+        This is a restricted, safety-focused chat mode. Conversations stay
+        on this device, just like the main app. A parent or guardian
+        should still review how this is used — this page does not verify
+        anyone's age and is not a substitute for supervision.
+      </div>
+
+      <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+        <div class="message system-message">
+          <p>Welcome! This chat only uses models that have been restricted for age-appropriate responses, and nothing you type is saved anywhere except this browser.</p>
+          <p>Your anonymous ID: <code id="display-uid">…</code></p>
+        </div>
+      </div>
+
+      <form id="chat-form" class="chat-input-row" novalidate>
+        <textarea
+          id="message-input"
+          class="message-textarea"
+          placeholder="Type a message… (Shift+Enter for new line)"
+          rows="1"
+          maxlength="8000"
+          aria-label="Message input"
+        ></textarea>
+        <button type="submit" id="send-btn" class="btn btn-primary" aria-label="Send message">
+          Send
+        </button>
+      </form>
+
+      <div class="status-bar">
+        <span id="usage-info" class="usage-info"></span>
+        <button id="clear-history-btn" class="btn btn-ghost btn-sm">Clear history</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Backdrop element kept for CSS compatibility with shared app.js,
+       even though no modals are used on this page. -->
+  <div id="modal-backdrop" class="modal-backdrop" hidden></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

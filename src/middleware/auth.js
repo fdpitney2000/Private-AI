@@ -19,29 +19,34 @@ const { getSubscription, incrementRequestCount } = require('../services/supabase
 // Define what each plan can do. Add or change tiers here.
 const PLAN_LIMITS = {
   free: {
-    requestsPerDay: 2000,
-    // Models allowed on the free tier (low-cost OpenRouter models)
+    requestsPerDay: 10,
+    // Models allowed on the free tier — OpenRouter's free-tier models
+    // require the ":free" suffix, or OpenRouter routes to the paid
+    // endpoint (which may 404 if you have no credit / no active route).
+    // NOTE: OpenRouter's free model catalog changes often. If one of
+    // these starts 404ing, check https://openrouter.ai/models?max_price=0
+    // for current free model IDs and update this list.
     allowedModels: [
-      'cohere/north-mini-code:free',
-      'nex-agi/nex-n2-pro:free',
+      'mistralai/mistral-7b-instruct:free',
+      'meta-llama/llama-4-scout:free',
     ],
   },
   pro50: {
     requestsPerDay: 200,
     allowedModels: [
-      'mistralai/mistral-7b-instruct',
-      'google/gemma-7b-it',
+      'mistralai/mistral-7b-instruct:free',
+      'meta-llama/llama-4-scout:free',
       'openai/gpt-4o-mini',
-      'anthropic/claude-3-haiku',
+      'anthropic/claude-3-5-haiku',
     ],
   },
   pro100: {
     requestsPerDay: 500,
     allowedModels: [
-      'mistralai/mistral-7b-instruct',
-      'google/gemma-7b-it',
+      'mistralai/mistral-7b-instruct:free',
+      'meta-llama/llama-4-scout:free',
       'openai/gpt-4o-mini',
-      'anthropic/claude-3-haiku',
+      'anthropic/claude-3-5-haiku',
       'openai/gpt-4o',
       'anthropic/claude-3-5-sonnet',
     ],
@@ -126,14 +131,54 @@ async function requireAuth(req, res, next) {
 }
 
 // -------------------------------------------------------
-// Model access check helper
+// Model access check helper (legacy — static list)
 // -------------------------------------------------------
-// Call this in the chat route to verify the requested model
-// is allowed on the user's plan.
+// Kept for backward compatibility / reference. The chat route now uses
+// classifyModelTier()/isPaidModelAllowed() below instead, since the
+// model picker is populated dynamically from OpenRouter's live catalog
+// (see CONTEXT.md — hardcoded model IDs go stale and 404).
 function isModelAllowed(plan, requestedModel) {
   const allowed = plan.limits.allowedModels;
   if (allowed.includes('*')) return true;            // pro200: all models
   return allowed.includes(requestedModel);
 }
 
-module.exports = { requireAuth, isModelAllowed, PLAN_LIMITS };
+// -------------------------------------------------------
+// Dynamic model tier classification
+// -------------------------------------------------------
+// Rather than maintaining a hardcoded list of exact model IDs per plan
+// (which breaks every time a provider ships a new version), we classify
+// any model ID into a cost tier by pattern-matching its slug, and gate
+// plans against the tier rather than the exact ID. This keeps working
+// automatically as OpenRouter's catalog changes.
+//
+//   free     -> ":free" suffix models, available to everyone
+//   cheap    -> "mini"/"haiku"/"flash-lite" variants, requires pro50+
+//   frontier -> mainline flagship models (gpt-5.x, gemini-3-pro, claude
+//               sonnet), requires pro100+
+//   ultra    -> top-of-line "opus"-class models, requires pro200
+function classifyModelTier(modelId) {
+  if (!modelId) return 'frontier';
+  if (modelId.endsWith(':free')) return 'free';
+  if (/opus/i.test(modelId)) return 'ultra';
+  if (/mini|haiku|flash-lite/i.test(modelId)) return 'cheap';
+  return 'frontier';
+}
+
+const TIER_ORDER = ['cheap', 'frontier', 'ultra'];
+const PLAN_MAX_TIER_INDEX = { free: -1, pro50: 0, pro100: 1, pro200: 2 };
+
+function isPaidModelAllowed(planTier, modelId) {
+  const tier = classifyModelTier(modelId);
+  if (tier === 'free') return true;
+  const maxIndex = PLAN_MAX_TIER_INDEX[planTier] ?? -1;
+  return TIER_ORDER.indexOf(tier) <= maxIndex;
+}
+
+module.exports = {
+  requireAuth,
+  isModelAllowed,
+  classifyModelTier,
+  isPaidModelAllowed,
+  PLAN_LIMITS,
+};

@@ -184,7 +184,106 @@ verification fails and Stripe will show non-200s in its event log.
 
 ---
 
-## Stage 2 (designed, not yet built)
+## Model picker: dynamic catalog (added after the :free suffix incident)
+
+The model picker no longer hardcodes specific model IDs/versions for the
+"flagship" OpenAI/Gemini/Claude options. After hitting a real 404 from a
+hardcoded model ID going stale (see "Known issues" above), the picker
+now fetches OpenRouter's live catalog (`GET /api/v1/models`) server-side,
+cached in memory for 1 hour, and dynamically picks the newest model
+matching each provider/tier pattern. Logic lives in
+`src/routes/chat.js` (`pickFlagshipModels`, `pickFreeModels`,
+`getModelCatalog`). A small hardcoded `STATIC_FALLBACK_FLAGSHIP` /
+`STATIC_FALLBACK_FREE` list exists only as a last resort if the live
+catalog fetch fails outright (network issue, OpenRouter outage) — it is
+not the primary mechanism and will itself go stale over time, but it
+only matters during an actual outage.
+
+Free models are also pulled live from the same catalog rather than
+maintained by hand. The frontend shows the first 2 and offers a
+"show more" expander for the rest (`public/js/app.js`,
+`renderModelPicker`).
+
+Plan-based access control no longer matches against an exact static
+list of allowed IDs either — it classifies any model ID into a cost
+tier (`free` / `cheap` / `frontier` / `ultra`) by pattern (e.g. "haiku"
+or "mini" in the slug → cheap; "opus" → ultra) and gates plans against
+the tier. See `classifyModelTier` / `isPaidModelAllowed` in
+`src/middleware/auth.js`. This means a brand-new model shows up in the
+right plan tier automatically, without a code change, as long as its
+slug follows the usual naming conventions. If a provider ships a model
+with an unusual name that doesn't match any pattern, it falls through
+to `frontier` (pro100+) by default — check `classifyModelTier` if a
+new model ends up gated incorrectly.
+
+### Model picker UI: no real brand logos
+The model picker shows a small colored circle + letter per provider
+(`.model-logo` in `style.css`) instead of actual OpenAI/Google/
+Anthropic logos. This is intentional, not a placeholder oversight —
+official company logos are trademarked assets, and bundling them in
+the app without going through each company's brand guidelines is a
+real (if narrow) legal risk. If you want real logos later: get them
+from each company's official brand/press kit page, drop the files in
+`public/images/logos/`, and swap the `<span class="model-logo">` for an
+`<img>` tag in `providerLogoHTML()` in `app.js`.
+
+## "No-training models only" privacy toggle
+
+A radio toggle in the topbar lets the user restrict routing to
+OpenRouter providers that don't store/train on inputs. This maps
+directly to OpenRouter's per-request `provider.data_collection` field
+(`"deny"` = only use providers that don't collect/train on data) — see
+`callOpenRouter()` in `chat.js`. This is enforced by OpenRouter itself
+at the routing layer, not by anything our server can verify — we're
+trusting OpenRouter's provider data-policy metadata. If no eligible
+provider exists for a given model under this restriction, the request
+will 404 and the user sees "No provider matching your privacy setting
+is available for this model. Try a different model."
+
+## Minor-safe mode (`teen.html`)
+
+A separate page, `public/teen.html`, sets `<body data-mode="minor">`,
+which `app.js` checks to: hide billing/upgrade/recovery UI, hide the
+privacy radio (no-train routing is forced on automatically instead),
+and send `minorMode: true` with every chat request.
+
+Server-side enforcement lives in `chat.js`:
+- `isMinorSafeModel()` — restricts to closed-lab models only
+  (OpenAI/Google/Anthropic prefixes), explicitly excluding all
+  `:free`/open-weight models, since their built-in moderation varies
+  and isn't something we can vouch for.
+- A fixed `MINOR_SYSTEM_PROMPT` is force-prepended to every minor-mode
+  request, and any system message the client tries to send is
+  stripped first — the client cannot override this.
+- `data_collection: deny` (the no-train routing above) is applied
+  automatically, not just offered as an option.
+
+**Real limitation, not a hidden one:** this app has no accounts and no
+age verification — that's the whole point of the privacy model — so
+"minor mode" only applies when a request explicitly carries
+`minorMode: true`, which only `teen.html` sets. Nothing stops a
+technically capable person from calling `POST /api/chat` directly
+without that flag and bypassing all of this. Treat it as a sensible UX
+default, not an age-verified or legally compliant child-safety system.
+If this is ever meant for real use with actual children, COPPA-style
+requirements (verified parental consent, restrictions on data
+collected from minors) go well beyond what's implemented here — worth
+getting real legal advice on before relying on this for that purpose.
+
+## The "speak freely" quote — deliberately UI-only
+
+`index.html` shows "Permission to speak freely has been granted." as a
+tagline above the chat input (`.freedom-quote`). This is plain
+decorative HTML — it is never sent to OpenRouter or included in the
+`messages` array. That exact phrasing is a recognizable pattern used to
+try to get AI models to ignore their safety training, so it was
+deliberately kept out of any actual request payload. If a future
+change ever considers moving text like this into a system prompt sent
+to the relayed models, stop and reconsider — that crosses from "branding
+copy" into "trying to get someone else's model to drop its guardrails,"
+which isn't something this project should do.
+
+
 
 - Local-only conversation memory — partially exists already
   (`app.js` stores chat history in `localStorage`, never sent to the
