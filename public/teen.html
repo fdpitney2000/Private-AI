@@ -63,39 +63,58 @@
   </header>
 
   <main class="main-layout">
+
+    <!-- Sidebar kept for layout consistency with index.html. No privacy
+         toggle here — minor-mode requests always force no-train routing
+         server-side (see chat.js), so there's nothing for the user to
+         choose. The note below explains that rather than leaving this
+         column empty and unexplained. -->
+    <aside class="sidebar">
+      <h2 class="sidebar-title">Settings</h2>
+      <div class="sidebar-section">
+        <h3 class="sidebar-section-title">Data Privacy</h3>
+        <p class="sidebar-note">
+          Privacy-preserving routing is always on in Teen Mode — there's
+          nothing to configure here.
+        </p>
+      </div>
+    </aside>
+
     <section class="chat-section">
+      <div class="chat-inner">
 
-      <div class="safety-banner">
-        This is a restricted, safety-focused chat mode. Conversations stay
-        on this device, just like the main app. A parent or guardian
-        should still review how this is used — this page does not verify
-        anyone's age and is not a substitute for supervision.
-      </div>
-
-      <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
-        <div class="message system-message">
-          <p>Welcome! This chat only uses models that have been restricted for age-appropriate responses, and nothing you type is saved anywhere except this browser.</p>
-          <p>Your anonymous ID: <code id="display-uid">…</code></p>
+        <div class="safety-banner">
+          This is a restricted, safety-focused chat mode. Conversations stay
+          on this device, just like the main app. A parent or guardian
+          should still review how this is used — this page does not verify
+          anyone's age and is not a substitute for supervision.
         </div>
-      </div>
 
-      <form id="chat-form" class="chat-input-row" novalidate>
-        <textarea
-          id="message-input"
-          class="message-textarea"
-          placeholder="Type a message… (Shift+Enter for new line)"
-          rows="1"
-          maxlength="8000"
-          aria-label="Message input"
-        ></textarea>
-        <button type="submit" id="send-btn" class="btn btn-primary" aria-label="Send message">
-          Send
-        </button>
-      </form>
+        <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+          <div class="message system-message">
+            <p>Welcome! This chat only uses models that have been restricted for age-appropriate responses, and nothing you type is saved anywhere except this browser.</p>
+            <p>Your anonymous ID: <code id="display-uid">…</code></p>
+          </div>
+        </div>
 
-      <div class="status-bar">
-        <span id="usage-info" class="usage-info"></span>
-        <button id="clear-history-btn" class="btn btn-ghost btn-sm">Clear history</button>
+        <form id="chat-form" class="chat-input-row" novalidate>
+          <textarea
+            id="message-input"
+            class="message-textarea"
+            placeholder="Type a message… (Shift+Enter for new line)"
+            rows="1"
+            maxlength="8000"
+            aria-label="Message input"
+          ></textarea>
+          <button type="submit" id="send-btn" class="btn btn-primary" aria-label="Send message">
+            Send
+          </button>
+        </form>
+
+        <div class="status-bar">
+          <span id="usage-info" class="usage-info"></span>
+          <button id="clear-history-btn" class="btn btn-ghost btn-sm">Clear history</button>
+        </div>
       </div>
     </section>
   </main>

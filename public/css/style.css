@@ -74,14 +74,90 @@ html, body {
   height: calc(100vh - 57px); /* 57px = topbar height */
 }
 
+/* ============================================================
+   Sidebar — settings column (privacy toggle today, room for
+   more controls later: just add another .sidebar-section block)
+   ============================================================ */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 18px;
+  overflow-y: auto;
+}
+
+.sidebar-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.sidebar-section { margin-bottom: 22px; }
+
+.sidebar-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.sidebar-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Sidebar's own privacy-toggle layout — vertical instead of the
+   horizontal pill row this used when it lived in the topbar */
+.sidebar .privacy-toggle {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+}
+
+.sidebar .privacy-toggle-option { white-space: normal; }
+
+/* Collapse the sidebar below tablet width so mobile keeps the chat
+   column usable. Settings still reachable by scrolling up on narrow
+   screens since the sidebar sits above the chat area in DOM order
+   only visually via flex-direction change. */
+@media (max-width: 760px) {
+  .main-layout { flex-direction: column; height: auto; min-height: calc(100vh - 57px); }
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+  }
+  .chat-section { height: 70vh; }
+}
+
+/* ============================================================
+   Chat column — centered within whatever space remains after
+   the sidebar, independent of the sidebar's width
+   ============================================================ */
 .chat-section {
   flex: 1;
   display: flex;
-  flex-direction: column;
-  max-width: 860px;
-  margin: 0 auto;
-  width: 100%;
+  justify-content: center;
+  overflow: hidden; /* .chat-inner handles its own scrolling */
   padding: 0 12px;
+}
+
+.chat-inner {
+  width: 100%;
+  max-width: 860px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 /* ============================================================
@@ -437,7 +513,7 @@ code {
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
-  max-width: 220px;
+  max-width: 320px;
 }
 
 .model-picker-btn .chevron { color: var(--text-muted); font-size: 11px; }
@@ -446,8 +522,9 @@ code {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  width: 280px;
-  max-height: 360px;
+  width: 400px;
+  max-width: calc(100vw - 24px);
+  max-height: 420px;
   overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -535,9 +612,10 @@ code {
 .freedom-quote {
   text-align: center;
   font-style: italic;
-  font-size: 13px;
+  font-size: 19px;
+  font-weight: 500;
   color: var(--text-muted);
-  padding: 6px 0;
+  padding: 10px 0;
   border-left: none;
   margin: 0;
 }

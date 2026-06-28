@@ -346,7 +346,9 @@ async function loadAccountStatus() {
 // need to know about this.
 
 const FREE_MODELS_VISIBLE_BY_DEFAULT = 2;
+const FLAGSHIP_MODELS_VISIBLE_BY_DEFAULT = 5;
 let freeModelsExpanded = false;
+let flagshipModelsExpanded = false;
 let lastModelsResponse = null; // cached so "show more" can re-render without refetching
 
 // Generic monogram badge for a provider. Deliberately NOT an official
@@ -421,7 +423,11 @@ function renderModelPicker(data) {
   // ---- Flagship section (latest OpenAI / Gemini / Claude models) ----
   if (flagship.length) {
     html += `<div class="model-group-label">Flagship models</div>`;
-    flagship.forEach(m => {
+    const flagshipVisibleCount = flagshipModelsExpanded
+      ? flagship.length
+      : Math.min(FLAGSHIP_MODELS_VISIBLE_BY_DEFAULT, flagship.length);
+
+    flagship.slice(0, flagshipVisibleCount).forEach(m => {
       const isSelected = hiddenInput.value === m.id;
       const lockNote = m.locked
         ? `<span class="model-row-lock">Upgrade to ${planLabel(m.requiredPlan)}</span>`
@@ -434,6 +440,12 @@ function renderModelPicker(data) {
           ${lockNote}
         </div>`;
     });
+
+    if (!flagshipModelsExpanded && flagship.length > FLAGSHIP_MODELS_VISIBLE_BY_DEFAULT) {
+      html += `<button type="button" class="model-show-more" id="show-more-flagship-btn">
+        Show ${flagship.length - FLAGSHIP_MODELS_VISIBLE_BY_DEFAULT} more flagship models
+      </button>`;
+    }
   }
 
   // ---- Free section (dynamic — first 2, with "show more") ----
@@ -468,11 +480,20 @@ function renderModelPicker(data) {
     });
   });
 
-  const showMoreBtn = document.getElementById('show-more-free-btn');
-  if (showMoreBtn) {
-    showMoreBtn.addEventListener('click', (e) => {
+  const showMoreFreeBtn = document.getElementById('show-more-free-btn');
+  if (showMoreFreeBtn) {
+    showMoreFreeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       freeModelsExpanded = true;
+      renderModelPicker(lastModelsResponse);
+    });
+  }
+
+  const showMoreFlagshipBtn = document.getElementById('show-more-flagship-btn');
+  if (showMoreFlagshipBtn) {
+    showMoreFlagshipBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      flagshipModelsExpanded = true;
       renderModelPicker(lastModelsResponse);
     });
   }

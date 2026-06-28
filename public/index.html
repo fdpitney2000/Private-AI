@@ -23,18 +23,6 @@
       <span id="plan-badge" class="plan-badge plan-free">Free</span>
     </div>
     <div class="topbar-right">
-      <!-- Privacy routing toggle: standard vs. no-training-only providers -->
-      <div class="privacy-toggle" role="radiogroup" aria-label="Data privacy preference">
-        <label class="privacy-toggle-option">
-          <input type="radio" name="data-policy" value="standard" checked>
-          <span>Standard</span>
-        </label>
-        <label class="privacy-toggle-option">
-          <input type="radio" name="data-policy" value="no-train">
-          <span>No-training models only</span>
-        </label>
-      </div>
-
       <!-- Custom model picker (native <select> can't show logos in its
            options, so this is a button + popover list built in app.js,
            populated from /api/chat/models). The hidden input below is
@@ -59,41 +47,66 @@
        ================================================ -->
   <main class="main-layout">
 
-    <!-- Chat area -->
-    <section class="chat-section">
-      <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
-        <!-- Welcome message -->
-        <div class="message system-message">
-          <p>Welcome! Your identity is completely anonymous. Chats are stored only in this browser — never on any server.</p>
-          <p>Your anonymous ID: <code id="display-uid">…</code></p>
+    <!-- Left sidebar — settings that apply to this device's session.
+         More controls can be added here later (additional sections,
+         same pattern: .sidebar-section + .sidebar-section-title). -->
+    <aside class="sidebar">
+      <h2 class="sidebar-title">Settings</h2>
+
+      <div class="sidebar-section">
+        <h3 class="sidebar-section-title">Data Privacy</h3>
+        <div class="privacy-toggle" role="radiogroup" aria-label="Data privacy preference">
+          <label class="privacy-toggle-option">
+            <input type="radio" name="data-policy" value="standard" checked>
+            <span>Standard routing</span>
+          </label>
+          <label class="privacy-toggle-option">
+            <input type="radio" name="data-policy" value="no-train">
+            <span>No-training models only</span>
+          </label>
         </div>
       </div>
 
-      <!-- Tagline shown directly above the input — describes this
-           app's own privacy stance (nothing logged, nothing trained
-           on). Deliberately just UI copy, never sent as part of any
-           request to the relayed AI models. -->
-      <blockquote class="freedom-quote">Permission to speak freely has been granted.</blockquote>
+      <!-- Future sidebar features go here, as additional .sidebar-section blocks -->
+    </aside>
 
-      <!-- Input row -->
-      <form id="chat-form" class="chat-input-row" novalidate>
-        <textarea
-          id="message-input"
-          class="message-textarea"
-          placeholder="Type a message… (Shift+Enter for new line)"
-          rows="1"
-          maxlength="8000"
-          aria-label="Message input"
-        ></textarea>
-        <button type="submit" id="send-btn" class="btn btn-primary" aria-label="Send message">
-          Send
-        </button>
-      </form>
+    <!-- Chat area -->
+    <section class="chat-section">
+      <div class="chat-inner">
+        <div id="chat-messages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat messages">
+          <!-- Welcome message -->
+          <div class="message system-message">
+            <p>Welcome! Your identity is completely anonymous. Chats are stored only in this browser — never on any server.</p>
+            <p>Your anonymous ID: <code id="display-uid">…</code></p>
+          </div>
+        </div>
 
-      <!-- Status bar: rate limit info -->
-      <div class="status-bar">
-        <span id="usage-info" class="usage-info"></span>
-        <button id="clear-history-btn" class="btn btn-ghost btn-sm">Clear history</button>
+        <!-- Tagline shown directly above the input — describes this
+             app's own privacy stance (nothing logged, nothing trained
+             on). Deliberately just UI copy, never sent as part of any
+             request to the relayed AI models. -->
+        <blockquote class="freedom-quote">Permission to speak freely has been granted.</blockquote>
+
+        <!-- Input row -->
+        <form id="chat-form" class="chat-input-row" novalidate>
+          <textarea
+            id="message-input"
+            class="message-textarea"
+            placeholder="Type a message… (Shift+Enter for new line)"
+            rows="1"
+            maxlength="8000"
+            aria-label="Message input"
+          ></textarea>
+          <button type="submit" id="send-btn" class="btn btn-primary" aria-label="Send message">
+            Send
+          </button>
+        </form>
+
+        <!-- Status bar: rate limit info -->
+        <div class="status-bar">
+          <span id="usage-info" class="usage-info"></span>
+          <button id="clear-history-btn" class="btn btn-ghost btn-sm">Clear history</button>
+        </div>
       </div>
     </section>
 
