@@ -606,6 +606,20 @@ code {
 
 .model-show-more:hover { text-decoration: underline; }
 
+/* Explanatory note shown in place of free models when no-train mode is
+   active — keeps the section visible so the user knows the filtering
+   is working, rather than the free models section silently disappearing */
+.model-picker-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 10px;
+  line-height: 1.5;
+  background: var(--bg);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  margin: 2px 0 4px;
+}
+
 /* ============================================================
    "Permission to speak freely" tagline above the input
    ============================================================ */

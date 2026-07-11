@@ -413,14 +413,23 @@ function showModelLoadError(labelEl, message) {
   if (btn) btn.dataset.loadFailed = 'true';
 }
 
+function isNoTrainActive() {
+  const radio = document.querySelector('input[name="data-policy"]:checked');
+  return radio && radio.value === 'no-train';
+}
+
 function renderModelPicker(data) {
-  const panel = document.getElementById('model-picker-panel');
+  const panel      = document.getElementById('model-picker-panel');
   const hiddenInput = document.getElementById('model-select');
   const { flagship = [], free = [] } = data;
+  const noTrain    = isNoTrainActive();
 
   let html = '';
 
-  // ---- Flagship section (latest OpenAI / Gemini / Claude models) ----
+  // ---- Flagship section ----
+  // Flagship models from OpenAI, Google, and Anthropic all have
+  // no-training provider options available through OpenRouter's routing
+  // layer, so they're always shown regardless of the privacy toggle.
   if (flagship.length) {
     html += `<div class="model-group-label">Flagship models</div>`;
     const flagshipVisibleCount = flagshipModelsExpanded
@@ -448,10 +457,29 @@ function renderModelPicker(data) {
     }
   }
 
-  // ---- Free section (dynamic — first 2, with "show more") ----
-  if (free.length) {
+  // ---- Free section ----
+  // Free models on OpenRouter are free because the hosting providers
+  // use your prompts for training — that's the trade-off. When the
+  // user has chosen "No-training models only," showing free models
+  // would be misleading: they'd appear in the picker but the
+  // server-side data_collection: "deny" routing would either route to
+  // a paid provider for them (unexpected cost) or return a 404 if no
+  // no-training provider exists for that model. So we hide them
+  // entirely and explain why, rather than silently leaving a broken
+  // selection in the list.
+  if (noTrain) {
+    html += `
+      <div class="model-group-label">Free models</div>
+      <div class="model-picker-note">
+        Free models are hidden — they're hosted by providers that train
+        on user data, which conflicts with the privacy setting you've
+        chosen. Switch back to Standard routing to see them.
+      </div>`;
+  } else if (free.length) {
     html += `<div class="model-group-label">Free models</div>`;
-    const visibleCount = freeModelsExpanded ? free.length : Math.min(FREE_MODELS_VISIBLE_BY_DEFAULT, free.length);
+    const visibleCount = freeModelsExpanded
+      ? free.length
+      : Math.min(FREE_MODELS_VISIBLE_BY_DEFAULT, free.length);
 
     free.slice(0, visibleCount).forEach(m => {
       const isSelected = hiddenInput.value === m.id;
@@ -498,13 +526,26 @@ function renderModelPicker(data) {
     });
   }
 
-  // Pick a sensible default selection if nothing is selected yet
-  if (!hiddenInput.value) {
-    const firstUnlocked = flagship.find(m => !m.locked) || free[0];
+  // ---- Selection hygiene ----
+  // If nothing is selected yet, pick the first unlocked model.
+  // If no-train was just toggled ON and the currently selected model
+  // is a free model (which we've now hidden), auto-switch to the first
+  // flagship model so the user isn't silently chatting with a model
+  // that trains on their data despite having asked for the opposite.
+  const currentId   = hiddenInput.value;
+  const currentIsFree = free.some(m => m.id === currentId);
+
+  if (!currentId) {
+    const firstUnlocked = flagship.find(m => !m.locked) || (noTrain ? null : free[0]);
     if (firstUnlocked) selectModel(firstUnlocked.id, firstUnlocked.name);
+  } else if (noTrain && currentIsFree) {
+    const firstFlagship = flagship.find(m => !m.locked);
+    if (firstFlagship) {
+      selectModel(firstFlagship.id, firstFlagship.name);
+    }
   } else {
     // Keep the button label in sync with whatever's already selected
-    const current = [...flagship, ...free].find(m => m.id === hiddenInput.value);
+    const current = [...flagship, ...free].find(m => m.id === currentId);
     if (current) document.getElementById('model-picker-selected').textContent = current.name;
   }
 }
@@ -770,7 +811,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (picker && !picker.contains(e.target)) closeModelPicker();
   });
 
-  // --- Privacy toggle: re-send isn't needed, sendMessage reads the radio live ---
+  // --- Privacy toggle: re-render the model picker when it changes ---
+  // The picker itself reads isNoTrainActive() at render time, so just
+  // calling renderModelPicker() with the cached response is enough to
+  // refresh the visible list. We also close the dropdown if it's open
+  // so the user sees the updated list when they next open it rather
+  // than a stale open panel.
+  document.querySelectorAll('input[name="data-policy"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      closeModelPicker();
+      if (lastModelsResponse) renderModelPicker(lastModelsResponse);
+    });
+  });
 
   // --- Plan selection in upgrade modal (no-op on teen.html — empty list) ---
   document.querySelectorAll('.upgrade-select-btn').forEach(btn => {
